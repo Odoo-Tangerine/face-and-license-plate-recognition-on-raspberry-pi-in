@@ -1,4 +1,5 @@
 import cv2
+import pickle
 import numpy as np
 import face_recognition
 from dataclasses import dataclass
@@ -27,13 +28,21 @@ class FaceRecognition:
     def _face_distance(known_face_encodings, face_encoding):
         return face_recognition.face_distance(known_face_encodings, face_encoding)
 
-    def handle_face_recognition(self, frame, known_face_encodings):
-        face_locations = self._face_locations(self._resize_image_to_1_4(frame))
-        if not face_locations:
-            return False
-        face_encodings = self._face_encodings(self._resize_image_to_1_4(frame), face_locations)
+    def compare_face(self, face, frame):
+        data_face = pickle.loads(face.encode('latin-1'))
+        # Resize frame of video to 1/4 size for faster face recognition processing
+        small_frame = self._resize_image_to_1_4(frame)
+        # Find all the faces and face encodings in the current frame of video
+        face_locations = self._face_locations(small_frame)
+        face_encodings = self._face_encodings(small_frame, face_locations)
+
+        if not face_encodings: return False
+
         for face_encoding in face_encodings:
-            matches = self._compare_faces(known_face_encodings, face_encoding)
-            face_distances = self._face_distance(known_face_encodings, face_encoding)
-            match_index = np.argmin(face_distances)
-            return matches[match_index]
+            # See if the face is a match for the known face(s)
+            matches = self._compare_faces([data_face], face_encoding)
+            # Or instead, use the known fcea with the smallest distance to the new face
+            face_distances = self._face_distance([data_face], face_encoding)
+            best_match_index = np.argmin(face_distances)
+            if matches[best_match_index]:
+                return matches[best_match_index]
